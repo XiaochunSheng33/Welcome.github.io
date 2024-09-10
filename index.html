@@ -1,0 +1,690 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+  <title>WebGL Globe</title>
+  <meta charset="utf-8">
+  <style type="text/css">
+     html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: sans-serif;
+      color: #333;
+      background: #F6F5F3;
+      overflow: auto; /* 确保Y轴滚动可用 */
+    }
+    
+    #container {
+      position: fixed; /* 固定位置 */
+      top: 0;
+      right: 0;
+      width: 50%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .content {
+      position: relative;
+      padding: 20px;
+      max-width: 800px;
+      margin: 250px 0 0 80px; /* 上边距50px, 左边距40px, 右边距自动调整, 下边距0 */
+      opacity: 0; /* 初始时透明度为0 */
+      transition: opacity 1s ease-out; /* 添加渐变效果 */
+    }
+    .title-large {
+      font-family: 'Arial Narrow', sans-serif; /* 小标题字体 */
+      font-size: 62px;
+      font-weight: normal;
+      line-height: 1.2;
+      color: #025D95; /* 标题颜色 */
+    }
+
+    .title-larger {
+      font-family: 'DIN 1451 Com Engschrift', 'Arial Narrow', sans-serif; /* 大标题字体 */
+      font-size: 148px;
+      font-weight: bold;
+      line-height: 1;
+      color: #025D95; /* 标题颜色 */
+      transition: transform 0.3s ease, font-size 0.3s ease; /* 添加过渡效果 */
+      display: inline-block; /* 确保过渡效果在块元素上起作用 */
+      text-decoration: none; /* 去除下划线 */
+    }
+
+    .title-larger:hover {
+     transform: scale(1.05); /* 鼠标悬停时放大 */
+     font-size: 155px; /* 鼠标悬停时字体更大 */
+    }
+
+    .paragraph {
+      font-family: 'Arial Narrow', sans-serif;
+      font-size: 18px;
+      font-weight: normal;
+      margin-top: 20px;
+      line-height: 1.4;
+    }
+
+    .scroll-button {
+      font-size: 14px;
+      margin-top: 100px;
+      cursor: pointer;
+      color: #05466C;
+      font-weight: bold;
+      text-align: left;
+      border: none;
+      background: none;
+    }
+
+    /* 样式用于章节卡片 */
+    .chapter-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 20px 0; /* 上下边距 */
+    margin-left: 100px; /* 左边距 */
+    max-width: 650px;
+    height: 250px; /* 卡片高度 */
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease; /* 添加卡片放大效果 */
+    text-decoration: none; /* 移除链接的下划线 */
+    color: inherit; /* 继承文字颜色 */
+    }
+
+    .chapter-card:hover {
+      transform: scale(1.05); /* 鼠标悬停时卡片放大 */
+    }
+
+    .chapter-card .text {
+      padding: 20px 30px 30px 30px; /* 顶部20px，其他保持30px */
+      width: 40%;
+    }
+
+    .chapter-card .text h2 {
+      font-size: 12px;
+      color: #ffffff;
+      margin: 0 0 10px;
+    }
+
+    .chapter-card .text p {
+      font-size: 40px;
+      font-family: 'DIN 1451 Com Engschrift', 'Arial Narrow', sans-serif; /* 大标题字体 */
+      font-weight: bold;
+      color: #ffffff;
+      margin: 0;
+    }
+
+    .chapter-card img {
+      width: 60%;
+      object-fit: cover;
+      transition: transform 0.3s ease; /* 添加图片过渡效果 */
+    }
+
+    .chapter-card:hover img {
+      transform: scale(1.1); /* 鼠标悬停时图片放大 */
+    }
+
+    /* 初始状态样式，用于白色背景内容块 */
+    .full-width-section {
+      position: relative; /* 初始相对定位 */
+      width: 100%; /* 占满整个页面宽度 */
+      height: 80vh; /* 占满整个视口高度 */
+      background-color: #ffffff; /* 白色背景 */
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 40px 80px; /* 上下左右的内边距 */
+      box-sizing: border-box; /* 确保内边距不会影响宽度 */
+      transition: all 0.5s ease; /* 添加过渡效果 */
+    }
+
+    /* 滚动到此部分时的全屏覆盖样式 */
+    .fullscreen {
+      position: fixed; /* 固定位置，使其覆盖整个页面 */
+      top: 0; /* 从页面顶部开始 */
+      left: 0; /* 从页面左侧开始 */
+      width: 100%; /* 占满整个页面宽度 */
+      height: 100%; /* 占满整个页面高度 */
+      z-index: 10; /* 确保其在地球背景的上方 */
+      padding: 40px 80px; /* 保持原来的内边距 */
+    }
+
+    /* 设置文字部分的宽度为40% */
+    .full-width-section .text-content {
+      width: 40%; /* 左侧文字占据40%的宽度 */
+      font-size: 12px;
+      color: #333;
+      line-height: 1.6;
+    }
+
+    .full-width-section .text-content h2 {
+      font-size: 60px; /* 大标题字体大小 */
+      font-weight: bold;
+      margin: 0 0 20px; /* 标题与下方文字的间距 */
+      font-family: 'Arial', sans-serif; /* 大标题字体 */
+      color: #025D95; /* 标题颜色 */
+      line-height: 1; /* 控制标题行间距，较小的值减少行间距 */
+    }
+
+    .full-width-section .text-content p {
+      font-size: 14px; /* 正文字体大小 */
+      margin: 0 0 20px; /* 段落与按钮的间距 */
+      font-family: 'Arial', serif; /* 正文字体 */
+    }
+
+    .full-width-section .text-content a.explore-button {
+      display: inline-block; /* 使按钮像块元素 */
+      font-size: 20px; /* 按钮字体大小 */
+      color: #ffffff; /* 按钮文字颜色 */
+      background-color: #025D95; /* 按钮背景颜色 */
+      padding: 10px 20px; /* 按钮内边距 */
+      text-decoration: none; /* 去除下划线 */
+      border-radius: 0px; /* 圆角 */
+      font-family: 'Arial', sans-serif; /* 按钮字体 */
+      transition: background-color 0.3s ease; /* 背景颜色过渡效果 */
+    }
+
+    .full-width-section .text-content a.explore-button:hover {
+      background-color: #0056b3; /* 按钮悬停时的颜色 */
+    }
+
+    /* 设置图片部分的宽度为60%，并确保对齐顶部 */
+    .full-width-section .image-content {
+      width: 60%; /* 右侧图片占据60%的宽度 */
+      display: flex; /* 使用 flexbox 布局来控制图片 */
+      justify-content: flex-end;
+      align-items: flex-start; /* 确保图片容器顶部对齐 */
+      left: 0; /* 从页面左侧开始 */
+    }
+
+    .full-width-section .image-content img {
+      width: 80%; /* 图片占满容器宽度 */
+      height: auto; /* 保持图片的比例 */
+      object-fit: cover; /* 图片覆盖容器 */
+      margin: 0; /* 确保没有额外的外边距 */
+      padding: 0; /* 确保没有额外的内边距 */
+    }
+
+    /* 新内容块的样式，图片覆盖整个页面，文字在上方 */
+    .full-screen-section {
+      position: relative;
+      width: 100%;
+      height: 80vh; /* 占满整个视口高度 */
+      background-image: url('file/high-resolution-manhattan-skyline-l.jpg'); /* 背景图片 */
+      background-size: cover; /* 确保图片覆盖整个背景 */
+      background-position: center; /* 图片居中显示 */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #ffffff; /* 确保文字在背景图片上清晰可见 */
+    }
+
+    /* 文字内容样式 */
+    .full-screen-section .text-content {
+      position: absolute; /* 绝对定位 */
+      bottom: 100px; /* 距离底部100px */
+      left: 80px; /* 距离左侧100px */
+      max-width: 800px;
+      z-index: 10; /* 确保文字在图片之上 */
+      padding: 20px;
+      text-align: left; /* 文字左对齐 */
+    }
+
+    /* 标题样式 */
+    .full-screen-section .text-content h2 {
+      font-size: 60px;
+      font-weight: bold;
+      margin: 0 0 20px;
+      font-family: 'Arial', sans-serif;
+      color: #ffffff; /* 确保标题在图片上可见 */
+    }
+
+    /* 段落样式 */
+    .full-screen-section .text-content p {
+      font-size: 18px;
+      margin: 0 0 20px;
+      font-family: 'Arial', serif;
+      color: #ffffff; /* 确保段落文字在图片上可见 */
+    }
+
+    /* 按钮样式 */
+    .full-screen-section .text-content a.explore-button {
+      display: inline-block;
+      font-size: 20px;
+      color: #025D95;
+      background-color: #ffffff;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 0px;
+      font-family: Arial, sans-serif;
+      transition: background-color 0.3s ease;
+    }
+
+    .full-screen-section .text-content a.explore-button:hover {
+      background-color: #0056b3;
+    }
+
+    #info {
+    font-size: 10px; /* 保持字体大小为10px */
+    position: absolute;
+    bottom: 10px;
+    background-color: rgba(255, 255, 255, 0.8); /* 背景颜色带有透明度 */
+    border-radius: 3px;
+    right: 10px;
+    padding: 5px 10px; /* 减少顶部和底部的内边距，左右内边距不变 */
+    line-height: 1.2; /* 控制行高，减少文本之间的间距 */
+    color: #808080; /* 将字体颜色设置为灰色 */
+    }
+
+    #ce span {
+      display: none;
+    }
+
+    #ce {
+    position: absolute;
+    top: 15px; /* 设置图片距离页面顶部的位置 */
+    left: 100px; /* 设置图片距离页面左侧的位置 */
+    }
+
+    #ce img {
+    width: auto; /* 自动调整宽度 */
+    height: auto; /* 自动调整高度 */
+    max-width: 180px; /* 限制最大宽度 */
+    max-height: 214px; /* 限制最大高度 */
+    display: block;
+    }
+
+    #ce2 span {
+      display: none;
+    }
+
+    #ce2 {
+    position: absolute;
+    top: 10px; /* 设置图片距离页面顶部的位置 */
+    left: 300px; /* 设置图片距离页面左侧的位置 */
+    }
+
+    #ce2 img {
+    width: auto; /* 自动调整宽度 */
+    height: auto; /* 自动调整高度 */
+    max-width: 180px; /* 限制最大宽度 */
+    max-height: 214px; /* 限制最大高度 */
+    display: block;
+    }
+
+    /* 页脚样式 */
+    .footer {
+      position: relative; /* 初始相对定位 */
+      width: 100%; /* 占满整个页面宽度 */
+      background-color: #f5f0e8; /* 背景颜色 */
+      display: flex;
+      flex-direction: column; /* 垂直布局 */
+      align-items: center;
+      justify-content: center;
+      padding: 40px 80px; /* 上下左右的内边距 */
+      box-sizing: border-box; /* 确保内边距不会影响宽度 */
+      text-align: center;
+      font-family: 'Arial', sans-serif;
+    }
+
+    .footer-top {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      margin-bottom: 20px;
+    }
+
+    .social-icons a {
+      margin: 0 10px;
+    }
+
+    .social-icons img {
+      width: 24px;
+      height: 24px;
+      transition: transform 0.3s ease;
+    }
+
+    .social-icons a:hover img {
+      transform: scale(1.2); /* 悬停时放大效果 */
+    }
+
+    .footer-nav {
+      margin-top: 20px;
+    }
+
+    .footer-nav a {
+      color: #99004c; /* 链接颜色 */
+      text-decoration: none;
+      margin: 0 15px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .footer-nav a:hover {
+      text-decoration: underline; /* 悬停时下划线 */
+    }
+
+    .footer-middle {
+      margin-top: 20px;
+    }
+
+    .partners {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .partners img {
+      height: 40px; /* 合作组织标识的高度 */
+      margin: 0 15px;
+    }
+
+    .footer-bottom {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .footer-bottom img {
+      height: 30px; /* 设计者标识的高度 */
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="container"></div>
+
+  <!-- 滚动内容 -->
+  <div class="content">
+    <div class="title-large">INSIGHTS FROM THE</div>
+    <a href="https://data.unhabitat.org/" target="_blank" class="title-larger">DATA VAULT</a>
+    <div class="paragraph">
+      <p>The data section is responsible for overall data oversight across all urban monitoring domains within UN-Habitat, methodological developments, supporting member states in their monitoring efforts around global agenda such as the SDGs, implementing direct data collection and compilation, providing data to UN-Habitat global reports, and publicly and openly disseminating urban data through its urban indicators programme.</p>
+    </div>
+    <button class="scroll-button" onclick="scrollToNextSection()">SCROLL TO CONTINUE ↓</button>
+  </div>
+
+<!-- 章节卡片示例 -->
+<a href="https://data.unhabitat.org/pages/sdgs" target="_blank" class="chapter-card" style="background-color: #D53939;">
+  <div class="text">
+    <h2>CHAPTER 1</h2>
+    <p>Urban Sustainable Development Goals (SDGs)</p>
+  </div>
+  <img src="file/Snipaste_2024-09-06_00-03-38.jpg" alt="Image for Chapter 1">
+</a>
+
+<a href="https://data.unhabitat.org/pages/new-urban-agenda" target="_blank" class="chapter-card" style="background-color: #00796B;">
+  <div class="text">
+    <h2>CHAPTER 2</h2>
+    <p>New Urban Agenda (NUA)</p>
+  </div>
+  <img src="file/30394762075_8e4b2c5b89_c.jpg" alt="Image for Chapter 2">
+</a>
+
+<a href="https://data.unhabitat.org/pages/city-prosperity-index" target="_blank" class="chapter-card" style="background-color: #303F9F;">
+  <div class="text">
+    <h2>CHAPTER 3</h2>
+    <p>City Prosperity Index (CPI)</p>
+  </div>
+  <img src="file/Snipaste_2024-09-05_23-58-27.jpg" alt="Image for Chapter 3">
+</a>
+
+<a href="https://data.unhabitat.org/pages/city-prosperity-index" target="_blank" class="chapter-card" style="background-color: #f5d401f2;">
+  <div class="text">
+    <h2>CHAPTER 4</h2>
+    <p>******</p>
+  </div>
+  <img src="file/Snipaste_2024-09-06_00-16-56.jpg" alt="Image for Chapter 4">
+</a>
+
+<a href="https://data.unhabitat.org/pages/city-prosperity-index" target="_blank" class="chapter-card" style="background-color: #ea9dbd;">
+  <div class="text">
+    <h2>CHAPTER 5</h2>
+    <p>******</p>
+  </div>
+  <img src="file/Snipaste_2024-09-06_00-16-56.jpg" alt="Image for Chapter 5">
+</a>
+
+<!-- 白色背景内容块 -->
+<div class="full-width-section" id="scroll-section">
+  <div class="text-content">
+    <h2>Urban observatories share experiences and innovations</h2>
+    <p>
+      UN-Habitat’s Data and Analytics Section, the global coordinator of the Global Urban Observatory Network (GUO-Net), in coordination with the GUO-Net Steering Committee, organized the second experiences sharing webinar among urban observatories on June,5 2023. The webinar, which attracted 35 representatives from 15 urban observatories in 10 countries showcased innovations around stakeholder engagement and data production and its use in decision making processes; and also deliberated on areas for further collaboration and partnerships.
+    </p>
+    <p>The urban observatory model was developed by UN-Habitat to address the acute challenge of city level data availability, and has over the years grown into a worldwide information and capacity-building network of local, national and regional observatories.
+    </p>
+    <a href="https://storymaps.arcgis.com/stories/eb572be92ba044ac92d812e9c6896c42" class="explore-button">Explore More →</a>
+  </div>
+  <div class="image-content">
+    <img src="file\47942346072_71a3eff75c.jpg" alt="Sample Image">
+  </div>
+</div>
+
+<!-- 新的带有全屏背景图片的内容块 -->
+<div class="full-screen-section">
+  <div class="text-content">
+    <h2>How do we define a CITY?</h2>
+    <p>"Cities have the capability of providing something for everybody, only because, and only when, they are created by everybody."</p>
+    <p>Jane Jacobs - 《The Death and Life of Great American Cities》</p>
+    <a href="https://en.wikipedia.org/wiki/City" class="explore-button">Find Out More →</a>
+  </div>
+</div>
+
+<div id="info">
+  <strong><a href="https://data.unhabitat.org/">Urban Indicators Database</a></strong> <span class="bull">&bull;</span> Created by UN-Habitat ERSKI Team <span class="bull">&bull;</span> Data acquired from <a href="https://data.unhabitat.org/pages/urban-transport">SDG 11.2.1</a>
+</div>
+
+<div id="currentInfo">
+  <span id="year1990" class="year">1</span>
+  <span id="year1995" class="year">2</span>
+  <span id="year2000" class="year">3</span>
+</div>
+
+<a id="ce" href="https://unhabitat.org/">
+  <img src="file/UNHABITAT.svg.png" alt="UN-Habitat Logo">
+</a>
+
+<!-- 正确的 a 标签和 img 标签 -->
+<a id="ce2" href="https://data.unhabitat.org/">
+  <img src="file/Snipaste_2024-09-06_15-28-34.jpg" alt="UN-Habitat Logo 2">
+</a>
+
+<!-- 页脚 -->
+<footer class="footer">
+  <div class="footer-top">
+    <!-- 社交媒体图标 -->
+    <div class="social-icons">
+      <a href="https://twitter.com" target="_blank"><img src="your-path/twitter-icon.png" alt="Twitter"></a>
+      <a href="https://instagram.com" target="_blank"><img src="your-path/instagram-icon.png" alt="Instagram"></a>
+      <a href="https://youtube.com" target="_blank"><img src="your-path/youtube-icon.png" alt="YouTube"></a>
+      <a href="https://linkedin.com" target="_blank"><img src="your-path/linkedin-icon.png" alt="LinkedIn"></a>
+      <a href="mailto:contact@example.com"><img src="your-path/email-icon.png" alt="Email"></a>
+    </div>
+
+    <!-- 导航链接 -->
+    <nav class="footer-nav">
+      <a href="#home">HOME</a>
+      <a href="#data-portal">DATA PORTAL</a>
+      <a href="#agenda-for-action">AGENDA FOR ACTION</a>
+      <a href="#about">ABOUT</a>
+    </nav>
+  </div>
+
+  <div class="footer-middle">
+    <!-- 合作组织标识 -->
+    <p>An initiative by</p>
+    <div class="partners">
+      <img src="your-path/logo1.png" alt="Partner 1">
+      <img src="your-path/logo2.png" alt="Partner 2">
+      <img src="your-path/logo3.png" alt="Partner 3">
+      <img src="your-path/logo4.png" alt="Partner 4">
+      <img src="your-path/logo5.png" alt="Partner 5">
+    </div>
+  </div>
+
+  <!-- 设计信息 -->
+  <div class="footer-bottom">
+    <p>Designed and developed by</p>
+    <img src="your-path/designer-logo.png" alt="Designer Logo">
+  </div>
+</footer>
+
+<script type="text/javascript" src="./scripts/Detector.js"></script>
+<script type="text/javascript" src="./scripts/three.min.js"></script>
+<script type="text/javascript" src="./scripts/Tween.js"></script>
+<script type="text/javascript" src="globe.js"></script>
+<script type="text/javascript">
+  if (!Detector.webgl) {
+    Detector.addGetWebGLMessage();
+  } else {
+    var years = ['1990', '1995', '2000'];
+    var container = document.getElementById('container');
+    var globe = new DAT.Globe(container, {
+    colorFn: function(value) {
+        var c = new THREE.Color();
+        
+        // 定义颜色渐变的起点和终点
+        var minHue = 0.0; // 蓝色的色相
+        var maxHue = 0.6; // 红色的色相
+        
+        // 将数值映射到 0 到 1 的范围内
+        var normalizedValue = value * 10;
+        
+        // 计算当前数据点的色相值
+        var hue = minHue * (1 - normalizedValue) + maxHue * normalizedValue;
+
+        // 设置饱和度和亮度
+        var saturation = 1.0; // 保持饱和度为100%
+        var lightness = 0.5; // 固定亮度为中等，确保颜色不太暗
+
+        // 应用颜色渐变
+        c.setHSL(hue, saturation, lightness);
+        return c;
+    }
+});
+
+    var i, tweens = [];
+
+    var settime = function(globe, t) {
+      return function() {
+        new TWEEN.Tween(globe).to({ time: t / years.length }, 500).easing(TWEEN.Easing.Cubic.EaseOut).start();
+        var y = document.getElementById('year' + years[t]);
+        if (y.getAttribute('class') === 'year active') {
+          return;
+        }
+        var yy = document.getElementsByClassName('year');
+        for (i = 0; i < yy.length; i++) {
+          yy[i].setAttribute('class', 'year');
+        }
+        y.setAttribute('class', 'year active');
+      };
+    };
+
+    for (var i = 0; i < years.length; i++) {
+      var y = document.getElementById('year' + years[i]);
+      y.addEventListener('mouseover', settime(globe, i), false);
+    }
+
+    var xhr;
+    TWEEN.start();
+
+    xhr = new XMLHttpRequest();
+    xhr.open('GET', '/data.json', true);
+    xhr.onreadystatechange = function(e) {
+      if (xhr.readyState === 4) {
+        if (xhr.status === 200) {
+          var data = JSON.parse(xhr.responseText);
+          window.data = data;
+          for (i = 0; i < data.length; i++) {
+            globe.addData(data[i][1], { format: 'magnitude', name: data[i][0], animated: true });
+          }
+          globe.createPoints();
+          settime(globe, 0)();
+          globe.animate();
+          document.body.style.backgroundImage = 'none'; // remove loading
+          
+          // 启动点的动画
+          setTimeout(function() {
+            for (var i = 0; i < tweens.length; i++) {
+              tweens[i].start();
+            }
+          }, 500); // 延迟500ms后开始所有点的动画
+        }
+      }
+    };
+    xhr.send(null);
+  }
+
+  // 修改后的 animate 函数
+  function animate() {
+    requestAnimationFrame(animate);
+    TWEEN.update(); // 更新所有的 TWEEN 动画
+    render();
+  }
+
+  function render() {
+    globe.renderer.render(globe.scene, globe.camera);
+  }
+
+  animate(); // 启动动画循环
+
+
+  // 动态显示内容
+  window.onload = function() {
+    var leftContent = document.getElementById('left-content');
+    setTimeout(function() {
+      leftContent.style.opacity = 1; // 逐渐显示内容
+    }, 500); // 0.5秒后开始显示
+  };
+
+  // 滚动到下一部分
+  function scrollToNextSection() {
+    window.scrollTo({
+      top: window.innerHeight,
+      behavior: 'smooth'
+    });
+  }
+</script>
+
+<script>
+  // 页面加载后逐渐显示内容
+  window.onload = function() {
+    var content = document.querySelector('.content');
+    setTimeout(function() {
+      content.style.opacity = 1; // 设置透明度为1，显示内容
+    }, 500); // 延迟0.5秒后显示
+  };
+
+  // 滚动时检查内容是否进入视口，并逐渐显示
+  window.addEventListener('scroll', function() {
+    var content = document.querySelector('.content');
+    var rect = content.getBoundingClientRect();
+
+    // 当元素进入视口并接近顶部时，逐渐显示
+    if (rect.top <= window.innerHeight && rect.bottom >= 0) {
+      content.style.opacity = 1;
+    }
+  });
+</script>
+
+<script>
+  window.addEventListener('scroll', function() {
+    var section = document.getElementById('scroll-section');
+    var rect = section.getBoundingClientRect();
+
+    // 当元素进入视口并接近顶部时，添加 fullscreen 类
+    if (rect.top <= 0 && rect.bottom >= window.innerHeight) {
+      section.classList.add('fullscreen');
+    } else {
+      section.classList.remove('fullscreen');
+    }
+  });
+</script>
+
+</body>
+</html>
